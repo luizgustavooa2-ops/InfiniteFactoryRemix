@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Infinite Factory</title>
+  <style>
+    /* ── CSS Variables ─────────────────────────────────────────── */
+    :root {
+      --bg:        #333;
+      --bg-deep:   #222;
+      --bg-raised: #444;
+      --border:    #555;
+      --text:      #ddd;
+      --text-dim:  #aaa;
+      --accent-ok: #55ff55;
+      --accent-bad:#ff5555;
+      --accent-warn:#ffaa00;
+      --shadow:    3px 3px 7px rgba(0,0,0,.5);
+    }
+    body.light-mode {
+      --bg:        #f0f0f0;
+      --bg-deep:   #ddd;
+      --bg-raised: #bbb;
+      --border:    #888;
+      --text:      #333;
+      --text-dim:  #666;
+      --shadow:    2px 2px 5px rgba(0,0,0,.2);
+    }
+
+    /* ── Base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 0;
+    }
+    h1 {
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-top: 20px;
+      color: var(--text);
+    }
+
+    /* ── Shared button / input ─────────────────────────────────── */
+    button {
+      background: var(--bg);
+      color: var(--text);
+      border: 2px solid var(--border);
+      padding: 10px 15px;
+      cursor: pointer;
+      border-radius: 3px;
+      margin: 5px;
+      box-shadow: 1px 1px 3px rgba(0,0,0,.3);
+      font-family: monospace;
+    }
+    button:hover  { background: var(--bg-raised); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+      padding: 8px 10px;
+      margin: 5px;
+      border: 2px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      border-radius: 3px;
+      font-family: monospace;
+    }
+
+    /* ── Stats panel ───────────────────────────────────────────── */
+    #statsContainer { width: 80%; margin-bottom: 15px; }
+    #stats {
+      border: 3px solid var(--border);
+      padding: 10px;
+      text-align: center;
+      background: var(--bg-deep);
+      border-radius: 5px;
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+      gap: 10px;
+    }
+
+    /* ── Filter / pagination bars ──────────────────────────────── */
+    .filter-bar {
+      margin-bottom: 8px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      font-size: 12px;
+      background: rgba(0,0,0,.15);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    .filter-bar input[type="text"],
+    .filter-bar select { padding: 4px 8px; height: 28px; font-size: 12px; margin: 0; }
+    .pagination-bar { margin-top: 10px; display: flex; gap: 5px; justify-content: center; }
+    .pagination-bar button { padding: 5px 10px; }
+    .pagination-bar button.active { background: var(--bg-raised); border-color: var(--text-dim); }
+
+    /* ── Machines grid ─────────────────────────────────────────── */
+    #machinesContainer { width: 90%; display: flex; flex-direction: column; align-items: center; }
+    #machines { display: flex; flex-wrap: wrap; justify-content: center; width: 100%; padding: 10px; }
+    .machine {
+      border: 3px solid var(--border);
+      padding: 15px;
+      margin: 10px;
+      width: 250px;
+      text-align: left;
+      background: var(--bg-deep);
+      border-radius: 5px;
+      box-shadow: var(--shadow);
+    }
+    .machine.inactive { opacity: .7; }
+    .machine-header { display: flex; align-items: center; margin-bottom: 5px; }
+    .count-badge {
+      background: var(--border);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-size: 10px;
+      margin-right: 5px;
+    }
+
+    /* ── Modal base (shared by ALL modals) ─────────────────────── */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      background: var(--bg);
+      color: var(--text);
+      border: 2px solid var(--border);
+      border-radius: 5px;
+      padding: 20px;
+      box-shadow: 2px 2px 5px rgba(0,0,0,.5);
+      overflow-y: auto;
+    }
+    .modal .close-btn {
+      position: absolute;
+      top: 10px; right: 10px;
+      cursor: pointer;
+      font-size: 25px;
+      color: var(--text-dim);
+      background: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+      box-shadow: none;
+    }
+    .modal .close-btn:hover { background: none; color: var(--text); }
+
+    /* ── Per-modal sizing overrides ────────────────────────────── */
+    #historyModal   { width: 80%; height: 80%; z-index: 1002; }
+    #saveMenu       { width: 50%; height: 60%; z-index: 1001; }
+    #notesModal     { width: 50%; max-height: 80%; z-index: 1004; }
+    #renameModal    { width: 40%; z-index: 1005; }
+    #deleteModal    { width: 40%; z-index: 1006; }
+    #welcomeModal   { width: 60%; max-height: 80%; z-index: 1007; text-align: left; }
+    #flowchartMenu  { width: 60%; height: 70%; z-index: 1003; }
+    #upgradeModal   { width: 60%; max-height: 80%; z-index: 1008; }
+    #utilitiesModal { width: 300px; z-index: 1000; }
+    #debugModal     {
+      width: 70%; max-height: 90%; z-index: 1010;
+      border-color: var(--accent-bad);
+      box-shadow: 0 0 15px rgba(255,85,85,.5);
+    }
+    #challengeInfoModal { width: 70%; max-height: 85%; z-index: 2005; }
+
+    /* ── History modal content ─────────────────────────────────── */
+    #historyContent { overflow-y: auto; height: calc(100% - 50px); font-size: 14px; }
+
+    /* ── Save list ─────────────────────────────────────────────── */
+    .saveItem {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .saveItem button { margin: 0 3px; padding: 5px 8px; }
+
+    /* ── Flowchart ─────────────────────────────────────────────── */
+    #flowchartCanvas {
+      width: 100%; height: 400px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      margin-top: 10px;
+    }
+    .flowchartItem {
+      padding: 5px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* ── Upgrades ──────────────────────────────────────────────── */
+    #upgradeOptions { display: flex; flex-direction: column; gap: 15px; }
+    .upgrade-option {
+      border: 1px solid var(--border);
+      padding: 15px;
+      border-radius: 5px;
+      background: var(--bg-deep);
+    }
+    .upgrade-option h3 { margin: 0 0 10px; }
+    .upgrade-cost { margin: 10px 0; font-style: italic; }
+    .upgrade-option button { width: 100%; }
+    .upgrade-option.insufficient { opacity: .6; }
+
+    /* ── Misc ──────────────────────────────────────────────────── */
+    .delete-stat { font-size: 12px; padding: 2px 6px; }
+    #utilitiesModal button { width: 100%; margin: 5px 0; }
+    #notesText { width: 100%; height: 200px; margin-bottom: 10px; }
+    #debugModal h2 { color: var(--accent-bad); text-align: center; }
+    #debugModal section { border-bottom: 1px solid var(--border); margin-bottom: 15px; padding-bottom: 15px; }
+
+    /* ── Factory setup fullscreen ──────────────────────────────── */
+    #factorySetupModal {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: #222;
+      color: #ddd;
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    #factorySetupModal .setup-card {
+      background: #333;
+      padding: 30px;
+      border: 2px solid #555;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0,0,0,.7);
+      max-width: 600px;
+      width: 100%;
+    }
+    #factorySetupModal select { width: 100%; padding: 8px; margin-top: 6px; }
+    #startFactoryButton { background: #4a4; border-color: #5b5; font-weight: bold; width: 100%; padding: 12px; }
+    #setupLoadSaveButton { background: #448; border-color: #559; width: 100%; padding: 12px; }
+    #skipSetupButton { background: #666; width: 100%; padding: 10px; font-size: 12px; opacity: .7; }
+
+    #gameUI { display: none; flex-direction: column; align-items: center; width: 100%; }
+
+    /* ── Trust log ─────────────────────────────────────────────── */
+    #trustLogContainer {
+      display: none;
+      margin-top: 10px;
+      max-height: 200px;
+      overflow: auto;
+      background: var(--bg-deep);
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .trust-entry { border-bottom: 1px solid rgba(255,255,255,.04); padding: 6px 0; font-size: 12px; }
+  </style>
+</head>
+
+<body>
+
+  <!-- ══════════════ FACTORY SETUP SCREEN ══════════════ -->
+  <div id="factorySetupModal">
+    <h1 style="margin-bottom:30px;">Infinite Factory</h1>
+    <div class="setup-card">
+      <h2 style="text-align:center;margin-top:0;">Create Your Factory</h2>
+      <p style="margin-bottom:20px;text-align:center;opacity:.8;">Choose your starting parameters or load a previous save.</p>
+
+      <div style="display:flex;flex-direction:column;gap:15px;margin-bottom:20px;">
+        <div>
+          <label><b>Difficulty</b></label>
+          <select id="setupDifficulty">
+            <option value="normal">Normal</option>
+            <option value="easy">Easy</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div>
+          <label><b>Starting Mode</b></label>
+          <select id="setupMode">
+            <option value="standard">Standard</option>
+            <option value="sandbox">Sandbox</option>
+            <option value="challenge">Challenge</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="setupEnableNewStatTypes">
+            <span>Enable special stat types (inverted / harmful stats)</span>
+          </label>
+          <div style="font-size:11px;opacity:.6;">Off by default. When off, the AI may create new plain additive stats but will not introduce inverted or harmful types.</div>
+        </div>
+        <div id="challengeSection" style="display:none;">
+          <label><b>Active Challenges</b></label>
+          <div style="background:#222;padding:10px;border-radius:4px;margin-top:6px;display:flex;flex-direction:column;gap:5px;">
+            <label><input type="checkbox" value="energy_crunch"> Energy Crunch</label>
+            <label><input type="checkbox" value="resource_crunch"> Resource Crunch</label>
+            <label><input type="checkbox" value="trust"> Trust</label>
+            <label><input type="checkbox" value="entropy"> Entropy</label>
+            <label><input type="checkbox" value="stability"> Stability</label>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">
+        <button id="startFactoryButton">Start New Factory</button>
+        <button id="setupLoadSaveButton">Load Existing Save</button>
+        <button id="skipSetupButton">Quick Start (Defaults)</button>
+      </div>
+      <p style="font-size:11px;margin-top:20px;opacity:.6;text-align:center;">You can modify these settings later in the Debug menu.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════ GAME UI ══════════════ -->
+  <div id="gameUI">
+    <h1>Infinite Factory</h1>
+
+    <div style="display:flex;gap:10px;">
+      <button id="infoButton">Info</button>
+      <button id="utilitiesButton">Utilities</button>
+    </div>
+
+    <!-- Stats -->
+    <div id="statsContainer">
+      <div class="filter-bar">
+        <b>Filter Stats:</b>
+        <select id="statFilterType">
+          <option value="all">All</option>
+          <option value="normal">Normal</option>
+          <option value="inverted">Inverted</option>
+        </select>
+      </div>
+      <div id="stats"></div>
+      <div id="statsPagination" class="pagination-bar"></div>
+    </div>
+
+    <!-- Machine creation -->
+    <div style="margin-bottom:20px;">
+      <input type="text" id="machineDescription" placeholder="Describe the machine">
+      <button id="createMachine">Create Machine</button>
+    </div>
+
+    <!-- Machine list -->
+    <div id="machinesContainer">
+      <div class="filter-bar">
+        <b>Search:</b>
+        <input type="text" id="machineSearch" placeholder="Filter by name...">
+        <b>Type:</b>
+        <select id="machineFilterType">
+          <option value="all">All Machines</option>
+          <option value="energy">Energy</option>
+          <option value="inverted">Inverted</option>
+          <option value="normal">Normal</option>
+        </select>
+      </div>
+      <div id="machines"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ MODALS ══════════════ -->
+
+  <!-- Utilities -->
+  <div id="utilitiesModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Utilities</h2>
+    <button id="saveButton">Save Game</button>
+    <button id="flowchartButton">Flowchart</button>
+    <button id="darkModeToggle">Toggle Dark Mode</button>
+    <button id="factoryHistoryButton">Factory History</button>
+    <button id="analyseFactory">Analyse Factory</button>
+    <button id="debugButton">Debug Menu</button>
+    <button id="trustLogButton">Trust Log</button>
+    <div id="trustLogContainer">
+      <h3 style="margin:0 0 8px;">Trust Log</h3>
+      <div id="trustLogEntries"></div>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div id="historyModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Factory Analysis History</h2>
+    <div id="historyContent"></div>
+  </div>
+
+  <!-- Save Menu -->
+  <div id="saveMenu" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Save Game</h2>
+    <input type="text" id="newSaveName" placeholder="New save name" style="width:100%;margin-bottom:10px;">
+    <div style="margin:8px 0;font-size:13px;">
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="enableNewStatTypes" disabled>
+        <span style="opacity:.8;">Enable special stat types for this save</span>
+      </label>
+    </div>
+    <button id="createSave">Create New Save</button>
+    <h3>Existing Saves</h3>
+    <div id="saveList"></div>
+    <button id="loadSave">Load Selected Save</button>
+  </div>
+
+  <!-- Rename -->
+  <div id="renameModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Rename Save</h2>
+    <p>New name:</p>
+    <input type="text" id="newSaveNameRename">
+    <button id="confirmRename">Confirm</button>
+  </div>
+
+  <!-- Notes -->
+  <div id="notesModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Save Notes</h2>
+    <p>Write anything you'd like to remember.</p>
+    <textarea id="notesText"></textarea>
+  </div>
+
+  <!-- Delete confirmation -->
+  <div id="deleteModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Delete Save</h2>
+    <p id="deleteConfirmationMessage">Are you sure?</p>
+    <button id="confirmDelete">Delete</button>
+    <button id="cancelDelete">Cancel</button>
+  </div>
+
+  <!-- Welcome / Info -->
+  <div id="welcomeModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2 style="text-align:center;">Welcome to Infinite Factory!</h2>
+    <p><b>Infinite Factory</b> is a game where you build an unlimited variety of machines that produce an unlimited variety of resources.</p>
+    <h3>Stats</h3>
+    <p><b>Stats</b> are shown in the top panel. They are consumed and produced by machines every second.</p>
+    <h3>Machines</h3>
+    <p><b>Machines</b> manipulate stats. A copper miner might consume 1 energy and produce 1 copper per second. You can disable or delete any machine. If you need a copper miner but it requires copper to build, make the <i>basic</i> version first — basic machines never require the resource they produce.</p>
+    <h3>Inverted Stats</h3>
+    <p>Some stats are <b>Inverted</b> (like Server Load or Heat). They don't accumulate — they show an instantaneous balance. If the balance exceeds 0 the stat is <b>OVERLOADED</b> and all machines producing it stall until you add machines that consume it.</p>
+    <h3>Analyse Factory</h3>
+    <p>Click <b>Analyse Factory</b> to get an AI summary of your factory and improvement suggestions. Past analyses appear in Factory History.</p>
+    <button id="okButton" style="display:block;margin:20px auto 0;">Got it</button>
+  </div>
+
+  <!-- Flowchart -->
+  <div id="flowchartMenu" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Stat Flowcharts</h2>
+    <div id="flowchartList"></div>
+    <canvas id="flowchartCanvas"></canvas>
+  </div>
+
+  <!-- Upgrades -->
+  <div id="upgradeModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2 id="upgradeModalTitle">Machine Upgrades</h2>
+    <div id="upgradeOptions"></div>
+  </div>
+
+  <!-- Challenge Info -->
+  <div id="challengeInfoModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2 style="text-align:center;color:#fff;margin-top:0;">Factory Briefing</h2>
+    <div id="challengeInfoContent"></div>
+    <button id="closeChallengeInfo" style="display:block;margin:20px auto 0;padding:10px 30px;background:#4a4;color:#fff;font-weight:bold;">Understood</button>
+  </div>
+
+  <!-- Debug -->
+  <div id="debugModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>DEBUG MENU</h2>
+
+    <section>
+      <h3>Time Control</h3>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <label>Tick Interval (ms): <input type="number" id="debugTickRate" value="1000" step="100" min="10"></label>
+        <button id="debugStep10Ticks">Step 10 Ticks</button>
+        <button id="debugStep100Ticks">Step 100 Ticks</button>
+      </div>
+      <p style="font-size:10px;">Lower = faster. Default 1000ms.</p>
+    </section>
+
+    <section>
+      <h3>Stat Management</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <span>New/Set:</span>
+          <input type="text" id="debugStatName" placeholder="Stat name (e.g. gold)" style="flex:1;">
+          <select id="debugStatType">
+            <option value="normal">Normal</option>
+            <option value="inverted">Inverted</option>
+          </select>
+          <input type="number" id="debugStatValue" placeholder="Value" value="0" style="width:80px;">
+          <button id="debugAddStat">Apply</button>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--bg-raised);padding:10px;border-radius:4px;">
+          <span>Modify Existing:</span>
+          <select id="debugEditStatTarget" style="flex:1;"></select>
+          <select id="debugEditStatType">
+            <option value="normal">Normal</option>
+            <option value="inverted">Inverted</option>
+          </select>
+          <button id="debugConvertStatType">Convert Type</button>
+          <button id="debugDeleteStat" style="background:#833;">Delete Stat</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h3>Manual Machine Spawner</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <input type="text" id="debugMachineName" placeholder="Machine Name">
+        <input type="text" id="debugMachineDesc" placeholder="Description">
+        <textarea id="debugMachineStats" placeholder='Stats JSON e.g. {"iron":10,"energy":-2}' style="height:60px;font-family:monospace;"></textarea>
+        <button id="debugSpawnMachine">Spawn Machine</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Resource Manipulation</h3
