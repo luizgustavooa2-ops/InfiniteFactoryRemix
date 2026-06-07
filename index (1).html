@@ -1,0 +1,1914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Infinite Factory</title>
+  <style>
+    /* ── CSS Variables ─────────────────────────────────────────── */
+    :root {
+      --bg:        #333;
+      --bg-deep:   #222;
+      --bg-raised: #444;
+      --border:    #555;
+      --text:      #ddd;
+      --text-dim:  #aaa;
+      --accent-ok: #55ff55;
+      --accent-bad:#ff5555;
+      --accent-warn:#ffaa00;
+      --shadow:    3px 3px 7px rgba(0,0,0,.5);
+    }
+    body.light-mode {
+      --bg:        #f0f0f0;
+      --bg-deep:   #ddd;
+      --bg-raised: #bbb;
+      --border:    #888;
+      --text:      #333;
+      --text-dim:  #666;
+      --shadow:    2px 2px 5px rgba(0,0,0,.2);
+    }
+
+    /* ── Base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 0;
+    }
+    h1 {
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-top: 20px;
+      color: var(--text);
+    }
+
+    /* ── Shared button / input ─────────────────────────────────── */
+    button {
+      background: var(--bg);
+      color: var(--text);
+      border: 2px solid var(--border);
+      padding: 10px 15px;
+      cursor: pointer;
+      border-radius: 3px;
+      margin: 5px;
+      box-shadow: 1px 1px 3px rgba(0,0,0,.3);
+      font-family: monospace;
+    }
+    button:hover  { background: var(--bg-raised); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+      padding: 8px 10px;
+      margin: 5px;
+      border: 2px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      border-radius: 3px;
+      font-family: monospace;
+    }
+
+    /* ── Stats panel ───────────────────────────────────────────── */
+    #statsContainer { width: 80%; margin-bottom: 15px; }
+    #stats {
+      border: 3px solid var(--border);
+      padding: 10px;
+      text-align: center;
+      background: var(--bg-deep);
+      border-radius: 5px;
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+      gap: 10px;
+    }
+
+    /* ── Filter / pagination bars ──────────────────────────────── */
+    .filter-bar {
+      margin-bottom: 8px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      font-size: 12px;
+      background: rgba(0,0,0,.15);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    .filter-bar input[type="text"],
+    .filter-bar select { padding: 4px 8px; height: 28px; font-size: 12px; margin: 0; }
+    .pagination-bar { margin-top: 10px; display: flex; gap: 5px; justify-content: center; }
+    .pagination-bar button { padding: 5px 10px; }
+    .pagination-bar button.active { background: var(--bg-raised); border-color: var(--text-dim); }
+
+    /* ── Machines grid ─────────────────────────────────────────── */
+    #machinesContainer { width: 90%; display: flex; flex-direction: column; align-items: center; }
+    #machines { display: flex; flex-wrap: wrap; justify-content: center; width: 100%; padding: 10px; }
+    .machine {
+      border: 3px solid var(--border);
+      padding: 15px;
+      margin: 10px;
+      width: 250px;
+      text-align: left;
+      background: var(--bg-deep);
+      border-radius: 5px;
+      box-shadow: var(--shadow);
+    }
+    .machine.inactive { opacity: .7; }
+    .machine-header { display: flex; align-items: center; margin-bottom: 5px; }
+    .count-badge {
+      background: var(--border);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-size: 10px;
+      margin-right: 5px;
+    }
+
+    /* ── Modal base (shared by ALL modals) ─────────────────────── */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      background: var(--bg);
+      color: var(--text);
+      border: 2px solid var(--border);
+      border-radius: 5px;
+      padding: 20px;
+      box-shadow: 2px 2px 5px rgba(0,0,0,.5);
+      overflow-y: auto;
+    }
+    .modal .close-btn {
+      position: absolute;
+      top: 10px; right: 10px;
+      cursor: pointer;
+      font-size: 25px;
+      color: var(--text-dim);
+      background: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+      box-shadow: none;
+    }
+    .modal .close-btn:hover { background: none; color: var(--text); }
+
+    /* ── Per-modal sizing overrides ────────────────────────────── */
+    #historyModal   { width: 80%; height: 80%; z-index: 1002; }
+    #saveMenu       { width: 50%; height: 60%; z-index: 1001; }
+    #notesModal     { width: 50%; max-height: 80%; z-index: 1004; }
+    #renameModal    { width: 40%; z-index: 1005; }
+    #deleteModal    { width: 40%; z-index: 1006; }
+    #welcomeModal   { width: 60%; max-height: 80%; z-index: 1007; text-align: left; }
+    #flowchartMenu  { width: 60%; height: 70%; z-index: 1003; }
+    #upgradeModal   { width: 60%; max-height: 80%; z-index: 1008; }
+    #utilitiesModal { width: 300px; z-index: 1000; }
+    #debugModal     {
+      width: 70%; max-height: 90%; z-index: 1010;
+      border-color: var(--accent-bad);
+      box-shadow: 0 0 15px rgba(255,85,85,.5);
+    }
+    #challengeInfoModal { width: 70%; max-height: 85%; z-index: 2005; }
+
+    /* ── History modal content ─────────────────────────────────── */
+    #historyContent { overflow-y: auto; height: calc(100% - 50px); font-size: 14px; }
+
+    /* ── Save list ─────────────────────────────────────────────── */
+    .saveItem {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .saveItem button { margin: 0 3px; padding: 5px 8px; }
+
+    /* ── Flowchart ─────────────────────────────────────────────── */
+    #flowchartCanvas {
+      width: 100%; height: 400px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      margin-top: 10px;
+    }
+    .flowchartItem {
+      padding: 5px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* ── Upgrades ──────────────────────────────────────────────── */
+    #upgradeOptions { display: flex; flex-direction: column; gap: 15px; }
+    .upgrade-option {
+      border: 1px solid var(--border);
+      padding: 15px;
+      border-radius: 5px;
+      background: var(--bg-deep);
+    }
+    .upgrade-option h3 { margin: 0 0 10px; }
+    .upgrade-cost { margin: 10px 0; font-style: italic; }
+    .upgrade-option button { width: 100%; }
+    .upgrade-option.insufficient { opacity: .6; }
+
+    /* ── Misc ──────────────────────────────────────────────────── */
+    .delete-stat { font-size: 12px; padding: 2px 6px; }
+    #utilitiesModal button { width: 100%; margin: 5px 0; }
+    #notesText { width: 100%; height: 200px; margin-bottom: 10px; }
+    #debugModal h2 { color: var(--accent-bad); text-align: center; }
+    #debugModal section { border-bottom: 1px solid var(--border); margin-bottom: 15px; padding-bottom: 15px; }
+
+    /* ── Factory setup fullscreen ──────────────────────────────── */
+    #factorySetupModal {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: #222;
+      color: #ddd;
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    #factorySetupModal .setup-card {
+      background: #333;
+      padding: 30px;
+      border: 2px solid #555;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0,0,0,.7);
+      max-width: 600px;
+      width: 100%;
+    }
+    #factorySetupModal select { width: 100%; padding: 8px; margin-top: 6px; }
+    #startFactoryButton { background: #4a4; border-color: #5b5; font-weight: bold; width: 100%; padding: 12px; }
+    #setupLoadSaveButton { background: #448; border-color: #559; width: 100%; padding: 12px; }
+    #skipSetupButton { background: #666; width: 100%; padding: 10px; font-size: 12px; opacity: .7; }
+
+    #gameUI { display: none; flex-direction: column; align-items: center; width: 100%; }
+
+    /* ── Trust log ─────────────────────────────────────────────── */
+    #trustLogContainer {
+      display: none;
+      margin-top: 10px;
+      max-height: 200px;
+      overflow: auto;
+      background: var(--bg-deep);
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .trust-entry { border-bottom: 1px solid rgba(255,255,255,.04); padding: 6px 0; font-size: 12px; }
+  </style>
+</head>
+
+<body>
+
+  <!-- ══════════════ FACTORY SETUP SCREEN ══════════════ -->
+  <div id="factorySetupModal">
+    <h1 style="margin-bottom:30px;">Infinite Factory</h1>
+    <div class="setup-card">
+      <h2 style="text-align:center;margin-top:0;">Create Your Factory</h2>
+      <p style="margin-bottom:20px;text-align:center;opacity:.8;">Choose your starting parameters or load a previous save.</p>
+
+      <div style="display:flex;flex-direction:column;gap:15px;margin-bottom:20px;">
+        <div>
+          <label><b>Difficulty</b></label>
+          <select id="setupDifficulty">
+            <option value="normal">Normal</option>
+            <option value="easy">Easy</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div>
+          <label><b>Starting Mode</b></label>
+          <select id="setupMode">
+            <option value="standard">Standard</option>
+            <option value="sandbox">Sandbox</option>
+            <option value="challenge">Challenge</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="setupEnableNewStatTypes">
+            <span>Enable special stat types (inverted / harmful stats)</span>
+          </label>
+          <div style="font-size:11px;opacity:.6;">Off by default. When off, the AI may create new plain additive stats but will not introduce inverted or harmful types.</div>
+        </div>
+        <div id="challengeSection" style="display:none;">
+          <label><b>Active Challenges</b></label>
+          <div style="background:#222;padding:10px;border-radius:4px;margin-top:6px;display:flex;flex-direction:column;gap:5px;">
+            <label><input type="checkbox" value="energy_crunch"> Energy Crunch</label>
+            <label><input type="checkbox" value="resource_crunch"> Resource Crunch</label>
+            <label><input type="checkbox" value="trust"> Trust</label>
+            <label><input type="checkbox" value="entropy"> Entropy</label>
+            <label><input type="checkbox" value="stability"> Stability</label>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">
+        <button id="startFactoryButton">Start New Factory</button>
+        <button id="setupLoadSaveButton">Load Existing Save</button>
+        <button id="skipSetupButton">Quick Start (Defaults)</button>
+      </div>
+      <p style="font-size:11px;margin-top:20px;opacity:.6;text-align:center;">You can modify these settings later in the Debug menu.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════ GAME UI ══════════════ -->
+  <div id="gameUI">
+    <h1>Infinite Factory</h1>
+
+    <div style="display:flex;gap:10px;">
+      <button id="infoButton">Info</button>
+      <button id="utilitiesButton">Utilities</button>
+    </div>
+
+    <!-- Stats -->
+    <div id="statsContainer">
+      <div class="filter-bar">
+        <b>Filter Stats:</b>
+        <select id="statFilterType">
+          <option value="all">All</option>
+          <option value="normal">Normal</option>
+          <option value="inverted">Inverted</option>
+        </select>
+      </div>
+      <div id="stats"></div>
+      <div id="statsPagination" class="pagination-bar"></div>
+    </div>
+
+    <!-- Machine creation -->
+    <div style="margin-bottom:20px;">
+      <input type="text" id="machineDescription" placeholder="Describe the machine">
+      <button id="createMachine">Create Machine</button>
+    </div>
+
+    <!-- Machine list -->
+    <div id="machinesContainer">
+      <div class="filter-bar">
+        <b>Search:</b>
+        <input type="text" id="machineSearch" placeholder="Filter by name...">
+        <b>Type:</b>
+        <select id="machineFilterType">
+          <option value="all">All Machines</option>
+          <option value="energy">Energy</option>
+          <option value="inverted">Inverted</option>
+          <option value="normal">Normal</option>
+        </select>
+      </div>
+      <div id="machines"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ MODALS ══════════════ -->
+
+  <!-- Utilities -->
+  <div id="utilitiesModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Utilities</h2>
+    <button id="saveButton">Save Game</button>
+    <button id="flowchartButton">Flowchart</button>
+    <button id="darkModeToggle">Toggle Dark Mode</button>
+    <button id="factoryHistoryButton">Factory History</button>
+    <button id="analyseFactory">Analyse Factory</button>
+    <button id="debugButton">Debug Menu</button>
+    <button id="changeApiKeyButton">Change API Key</button>
+    <button id="trustLogButton">Trust Log</button>
+    <div id="trustLogContainer">
+      <h3 style="margin:0 0 8px;">Trust Log</h3>
+      <div id="trustLogEntries"></div>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div id="historyModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Factory Analysis History</h2>
+    <div id="historyContent"></div>
+  </div>
+
+  <!-- Save Menu -->
+  <div id="saveMenu" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Save Game</h2>
+    <input type="text" id="newSaveName" placeholder="New save name" style="width:100%;margin-bottom:10px;">
+    <div style="margin:8px 0;font-size:13px;">
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="enableNewStatTypes" disabled>
+        <span style="opacity:.8;">Enable special stat types for this save</span>
+      </label>
+    </div>
+    <button id="createSave">Create New Save</button>
+    <h3>Existing Saves</h3>
+    <div id="saveList"></div>
+    <button id="loadSave">Load Selected Save</button>
+  </div>
+
+  <!-- Rename -->
+  <div id="renameModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Rename Save</h2>
+    <p>New name:</p>
+    <input type="text" id="newSaveNameRename">
+    <button id="confirmRename">Confirm</button>
+  </div>
+
+  <!-- Notes -->
+  <div id="notesModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Save Notes</h2>
+    <p>Write anything you'd like to remember.</p>
+    <textarea id="notesText"></textarea>
+  </div>
+
+  <!-- Delete confirmation -->
+  <div id="deleteModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Delete Save</h2>
+    <p id="deleteConfirmationMessage">Are you sure?</p>
+    <button id="confirmDelete">Delete</button>
+    <button id="cancelDelete">Cancel</button>
+  </div>
+
+  <!-- Welcome / Info -->
+  <div id="welcomeModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2 style="text-align:center;">Welcome to Infinite Factory!</h2>
+    <p><b>Infinite Factory</b> is a game where you build an unlimited variety of machines that produce an unlimited variety of resources.</p>
+    <h3>Stats</h3>
+    <p><b>Stats</b> are shown in the top panel. They are consumed and produced by machines every second.</p>
+    <h3>Machines</h3>
+    <p><b>Machines</b> manipulate stats. A copper miner might consume 1 energy and produce 1 copper per second. You can disable or delete any machine. If you need a copper miner but it requires copper to build, make the <i>basic</i> version first — basic machines never require the resource they produce.</p>
+    <h3>Inverted Stats</h3>
+    <p>Some stats are <b>Inverted</b> (like Server Load or Heat). They don't accumulate — they show an instantaneous balance. If the balance exceeds 0 the stat is <b>OVERLOADED</b> and all machines producing it stall until you add machines that consume it.</p>
+    <h3>Analyse Factory</h3>
+    <p>Click <b>Analyse Factory</b> to get an AI summary of your factory and improvement suggestions. Past analyses appear in Factory History.</p>
+    <button id="okButton" style="display:block;margin:20px auto 0;">Got it</button>
+  </div>
+
+  <!-- Flowchart -->
+  <div id="flowchartMenu" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>Stat Flowcharts</h2>
+    <div id="flowchartList"></div>
+    <canvas id="flowchartCanvas"></canvas>
+  </div>
+
+  <!-- Upgrades -->
+  <div id="upgradeModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2 id="upgradeModalTitle">Machine Upgrades</h2>
+    <div id="upgradeOptions"></div>
+  </div>
+
+  <!-- Challenge Info -->
+  <div id="challengeInfoModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2 style="text-align:center;color:#fff;margin-top:0;">Factory Briefing</h2>
+    <div id="challengeInfoContent"></div>
+    <button id="closeChallengeInfo" style="display:block;margin:20px auto 0;padding:10px 30px;background:#4a4;color:#fff;font-weight:bold;">Understood</button>
+  </div>
+
+  <!-- Debug -->
+  <div id="debugModal" class="modal">
+    <button class="close-btn">&times;</button>
+    <h2>DEBUG MENU</h2>
+
+    <section>
+      <h3>Time Control</h3>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <label>Tick Interval (ms): <input type="number" id="debugTickRate" value="1000" step="100" min="10"></label>
+        <button id="debugStep10Ticks">Step 10 Ticks</button>
+        <button id="debugStep100Ticks">Step 100 Ticks</button>
+      </div>
+      <p style="font-size:10px;">Lower = faster. Default 1000ms.</p>
+    </section>
+
+    <section>
+      <h3>Stat Management</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <span>New/Set:</span>
+          <input type="text" id="debugStatName" placeholder="Stat name (e.g. gold)" style="flex:1;">
+          <select id="debugStatType">
+            <option value="normal">Normal</option>
+            <option value="inverted">Inverted</option>
+          </select>
+          <input type="number" id="debugStatValue" placeholder="Value" value="0" style="width:80px;">
+          <button id="debugAddStat">Apply</button>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--bg-raised);padding:10px;border-radius:4px;">
+          <span>Modify Existing:</span>
+          <select id="debugEditStatTarget" style="flex:1;"></select>
+          <select id="debugEditStatType">
+            <option value="normal">Normal</option>
+            <option value="inverted">Inverted</option>
+          </select>
+          <button id="debugConvertStatType">Convert Type</button>
+          <button id="debugDeleteStat" style="background:#833;">Delete Stat</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h3>Manual Machine Spawner</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <input type="text" id="debugMachineName" placeholder="Machine Name">
+        <input type="text" id="debugMachineDesc" placeholder="Description">
+        <textarea id="debugMachineStats" placeholder='Stats JSON e.g. {"iron":10,"energy":-2}' style="height:60px;font-family:monospace;"></textarea>
+        <button id="debugSpawnMachine">Spawn Machine</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Resource Manipulation</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button id="debugAdd100">Add 100 to All Stats</button>
+        <button id="debugResetStats">Reset All Stats to 0</button>
+        <button id="debugMaxAllStats">Max All Stats (9999)</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Cheat Modes</h3>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="debugFreeBuildToggle"> Free Build Mode</label>
+        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="debugFreeUpgradesToggle"> Free Upgrades Mode</label>
+        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="debugShowCostInfoToggle"> Show Machine Cost Buttons</label>
+      </div>
+    </section>
+
+    <section>
+      <h3>Machine Manipulation</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button id="debugEnableAll">Enable All</button>
+        <button id="debugDisableAll">Disable All</button>
+        <button id="debugClearAll">Clear All Machines</button>
+        <button id="debugRepairAssets" style="background:#4a4;">Restore Starting Assets</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ══════════════ SCRIPTS ══════════════ -->
+  <script>
+    // Inline lodash shim — only the bits we use
+    window._ = {
+      capitalize: s => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : ''
+    };
+  </script>
+  <script>
+    // Load Chart.js async — flowchart just won't render if it fails
+    (function() {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+      s.onerror = () => console.warn('Chart.js failed to load — flowcharts disabled.');
+      document.head.appendChild(s);
+    })();
+  </script>
+  <script>
+  // ─────────────────────────────────────────────────────────────
+  //  GAME STATE
+  // ─────────────────────────────────────────────────────────────
+  const stats         = { energy: 0, iron: 0 };
+  const statsMetadata = { energy: 'normal', iron: 'normal' };
+  const badStatsMilestones = {};
+  const machines              = [];
+  const factoryAnalysisHistory = [];
+
+  let activeChallenges     = [];
+  let currentDifficulty    = 'normal';
+  let gameEnded            = false;
+  let trustLog             = [];
+  let entropyValue         = 1;
+  let displayedEntropy     = 1;
+  let entropyIntervalId    = null;
+  let freeBuildMode        = false;
+  let freeUpgradesMode     = false;
+  let showCostInfoButtons  = false;
+  let enableNewStatTypesFlag = false;
+  let factoryInitialized   = false;
+  let tickIntervalId       = null;
+  let currentTickRate      = 1000;
+  let currentStatPage      = 0;
+  let currentChart         = null;
+  let saveToRename         = null;
+  let selectedSave         = null;
+  let autoSaveInterval     = null;
+  let __restoreSetupOnSaveClose = false;
+  let __originalSaveParent = null;
+
+  const statsPerPage = 20;
+  let saves = JSON.parse(localStorage.getItem('infiniteFactorySaves')) || {};
+  window.statHistory = {};
+
+  // ─────────────────────────────────────────────────────────────
+  //  ELEMENT REFS
+  // ─────────────────────────────────────────────────────────────
+  const statsElement          = document.getElementById('stats');
+  const statsPaginationEl     = document.getElementById('statsPagination');
+  const machineDescInput      = document.getElementById('machineDescription');
+  const machinesElement       = document.getElementById('machines');
+  const machineSearchInput    = document.getElementById('machineSearch');
+  const machineFilterSelect   = document.getElementById('machineFilterType');
+  const statFilterSelect      = document.getElementById('statFilterType');
+  const historyModal          = document.getElementById('historyModal');
+  const historyContent        = document.getElementById('historyContent');
+  const debugModal            = document.getElementById('debugModal');
+  const factorySetupModal     = document.getElementById('factorySetupModal');
+  const gameUI                = document.getElementById('gameUI');
+  const welcomeModal          = document.getElementById('welcomeModal');
+  const saveMenu              = document.getElementById('saveMenu');
+  const renameModal           = document.getElementById('renameModal');
+  const utilitiesModal        = document.getElementById('utilitiesModal');
+  const upgradeModal          = document.getElementById('upgradeModal');
+  const flowchartMenu         = document.getElementById('flowchartMenu');
+  const flowchartList         = document.getElementById('flowchartList');
+  const flowchartCanvas       = document.getElementById('flowchartCanvas');
+  const challengeInfoModal    = document.getElementById('challengeInfoModal');
+  const trustLogContainer     = document.getElementById('trustLogContainer');
+  const trustLogEntries       = document.getElementById('trustLogEntries');
+  const newSaveNameRenameInput = document.getElementById('newSaveNameRename');
+
+  // ─────────────────────────────────────────────────────────────
+  //  HELPERS
+  // ─────────────────────────────────────────────────────────────
+  function formatStatName(stat) {
+    if (!stat) return '';
+    return stat.split('_').map(w => _.capitalize(w)).join(' ');
+  }
+
+  function closeModal(el) { el.style.display = 'none'; }
+  function openModal(el)  { el.style.display = 'block'; }
+
+  // Wire every .close-btn inside a .modal
+  document.querySelectorAll('.modal .close-btn').forEach(btn => {
+    btn.addEventListener('click', () => closeModal(btn.closest('.modal')));
+  });
+
+  // API KEY
+  let GEMINI_API_KEY = localStorage.getItem('infinite_factory_gemini_key') || '';
+
+  function ensureApiKey() {
+    return new Promise(resolve => {
+      if (GEMINI_API_KEY) { resolve(true); return; }
+      const modal = document.getElementById('apiKeyModal');
+      const input = document.getElementById('apiKeyInput');
+      const btn   = document.getElementById('apiKeyConfirm');
+      const err   = document.getElementById('apiKeyError');
+      err.textContent = '';
+      input.value = '';
+      modal.style.display = 'flex';
+      input.focus();
+      function confirm() {
+        const val = input.value.trim();
+        if (!val) { err.textContent = 'Please enter a key.'; return; }
+        GEMINI_API_KEY = val;
+        localStorage.setItem('infinite_factory_gemini_key', GEMINI_API_KEY);
+        modal.style.display = 'none';
+        btn.removeEventListener('click', confirm);
+        resolve(true);
+      }
+      btn.addEventListener('click', confirm);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') confirm(); });
+    });
+  }
+
+  // AI WRAPPER — uses Gemini 2.0 Flash (free tier)
+  async function aiComplete(messages, expectJson = false) {
+    const keyOk = await ensureApiKey();
+    if (!keyOk) throw new Error('No API key provided.');
+
+    const system = messages.find(m => m.role === 'system')?.content || '';
+    const userMessages = messages.filter(m => m.role !== 'system');
+
+    // Convert to Gemini format
+    const geminiContents = userMessages.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+
+    const body = {
+      contents: geminiContents,
+      generationConfig: {
+        maxOutputTokens: 1024,
+        ...(expectJson ? { responseMimeType: 'application/json' } : {})
+      }
+    };
+    if (system) body.systemInstruction = { parts: [{ text: system }] };
+
+    const model = 'gemini-2.0-flash';
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    );
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      if (response.status === 400 || response.status === 403) {
+        GEMINI_API_KEY = '';
+        localStorage.removeItem('infinite_factory_gemini_key');
+      }
+      throw new Error(err.error?.message || `API error ${response.status}`);
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (expectJson) return text.replace(/```(?:json)?|```/g, '').trim();
+    return text;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  STATS DISPLAY
+  // ─────────────────────────────────────────────────────────────
+  function updateStatsDisplay() {
+    statsElement.innerHTML = '';
+    statsPaginationEl.innerHTML = '';
+
+    const filterType = statFilterSelect.value;
+    const allStats = Object.keys(stats).filter(s =>
+      filterType === 'all' ? true : statsMetadata[s] === filterType
+    );
+
+    const totalPages = Math.ceil(allStats.length / statsPerPage);
+    if (currentStatPage >= totalPages && totalPages > 0) currentStatPage = totalPages - 1;
+    const pageStats = allStats.slice(currentStatPage * statsPerPage, (currentStatPage + 1) * statsPerPage);
+
+    // Mirror the same machine-filtering logic used in updateGame() so rates are accurate
+    const active = machines.filter(m => m.active);
+    const withRes = active.filter(m => {
+      for (const s in m.stats)
+        if (statsMetadata[s] === 'normal' && m.stats[s] < 0 && (stats[s]||0) + m.stats[s] < 0) return false;
+      return true;
+    });
+    const potBal = {};
+    for (const s in statsMetadata) {
+      if (statsMetadata[s] === 'inverted') {
+        potBal[s] = 0;
+        active.forEach(m => {
+          if (m.stats[s]) {
+            let a = m.stats[s];
+            if (activeChallenges.includes('entropy') && a > 0) a /= entropyValue;
+            potBal[s] += a;
+          }
+        });
+      }
+    }
+    const running = withRes.filter(m => {
+      for (const s in m.stats)
+        if (statsMetadata[s] === 'inverted' && m.stats[s] > 0 && potBal[s] > 0) return false;
+      return true;
+    });
+
+    function effectiveRate(stat) {
+      let total = 0;
+      running.forEach(m => {
+        if (!m.stats[stat]) return;
+        let a = m.stats[stat];
+        if (a > 0) {
+          const cm = currentDifficulty === 'easy' ? 0.75 : currentDifficulty === 'hard' ? 0.25 : 0.5;
+          if (stat === 'energy' && activeChallenges.includes('energy_crunch')) a *= cm;
+          else if (stat !== 'energy' && activeChallenges.includes('resource_crunch')) a *= cm;
+          if (activeChallenges.includes('entropy') && stat !== 'trust') a /= entropyValue;
+        }
+        total += a;
+      });
+      return Math.round(total * 100) / 100;
+    }
+
+    pageStats.forEach(stat => {
+      const div = document.createElement('div');
+      const val = Math.round((stats[stat]||0) * 100) / 100;
+      const name = formatStatName(stat);
+
+      if (stat === 'trust') {
+        const t = stats.trust || 0;
+        div.textContent = `${name}: ${Math.round(t)}%`;
+        div.style.fontWeight = 'bold';
+        div.style.color = t < 25 ? 'var(--accent-bad)' : t > 75 ? 'var(--accent-ok)' : '';
+      } else if (stat === 'entropy' && activeChallenges.includes('entropy')) {
+        div.textContent = `Entropy: ${Math.round(entropyValue * 100) / 100}x`;
+        div.style.fontWeight = 'bold';
+        div.style.color = 'var(--accent-warn)';
+      } else if (stat === 'stability' && activeChallenges.includes('stability')) {
+        const stab = calculateStability();
+        div.textContent = `Stability: ${Math.round(stab)}%`;
+        div.style.fontWeight = 'bold';
+        div.style.color = stab < 40 ? 'var(--accent-bad)' : stab > 80 ? 'var(--accent-ok)' : '';
+      } else if (statsMetadata[stat] === 'inverted') {
+        const bal = Math.round((potBal[stat]||0) * 100) / 100;
+        div.textContent = `${name}: ${bal}${bal > 0 ? ' (OVERLOADED)' : ' (OK)'}`;
+        if (bal > 0) div.style.color = 'var(--accent-bad)';
+      } else {
+        const rate = effectiveRate(stat);
+        div.textContent = `${name}: ${val} (${rate >= 0 ? '+' : ''}${rate}/s)`;
+      }
+      statsElement.appendChild(div);
+    });
+
+    if (totalPages > 1) {
+      for (let i = 0; i < totalPages; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = i + 1;
+        if (i === currentStatPage) btn.classList.add('active');
+        btn.onclick = () => { currentStatPage = i; updateStatsDisplay(); };
+        statsPaginationEl.appendChild(btn);
+      }
+    }
+  }
+
+  statFilterSelect.addEventListener('change', () => { currentStatPage = 0; updateStatsDisplay(); });
+
+  // ─────────────────────────────────────────────────────────────
+  //  MACHINE RENDERING
+  // ─────────────────────────────────────────────────────────────
+  function renderMachines() {
+    machinesElement.innerHTML = '';
+    const search = machineSearchInput.value.toLowerCase();
+    const filterType = machineFilterSelect.value;
+
+    const groups = {};
+    machines.forEach((m, i) => {
+      if (!m.name.toLowerCase().includes(search)) return;
+      if (filterType === 'energy'   && !Object.keys(m.stats).some(s => s === 'energy' && m.stats[s] > 0)) return;
+      if (filterType === 'inverted' && !Object.keys(m.stats).some(s => statsMetadata[s] === 'inverted')) return;
+      if (filterType === 'normal'   && !Object.keys(m.stats).some(s => statsMetadata[s] === 'normal')) return;
+
+      const key = `${m.name}|${m.description}|${JSON.stringify(m.stats)}`;
+      if (!groups[key]) groups[key] = { machine: m, indices: [i], activeCount: m.active ? 1 : 0 };
+      else { groups[key].indices.push(i); if (m.active) groups[key].activeCount++; }
+    });
+
+    Object.values(groups).forEach(({ machine: m, indices, activeCount }) => {
+      const div = document.createElement('div');
+      div.className = 'machine' + (activeCount === 0 ? ' inactive' : '');
+
+      let statsHtml = '';
+      for (const s in m.stats) {
+        const raw = m.stats[s];
+        if (typeof raw !== 'number' || raw === 0) continue;
+        const val = Math.round(activeCount * raw * 100) / 100;
+        if (val !== 0) statsHtml += `<div>${formatStatName(s)}: ${val}</div>`;
+      }
+
+      const badge = indices.length > 1 ? `<span class="count-badge">${indices.length}</span>` : '';
+      const costBtn = showCostInfoButtons ? `<button onclick="showMachineCostInfo('${indices[0]}')">Cost Info</button>` : '';
+      const idxStr = indices.join('-');
+
+      div.innerHTML = `
+        <div class="machine-header">${badge}<b>${m.name}</b></div>
+        <div>${m.description}</div>
+        ${statsHtml}
+        <div>
+          <button onclick="toggleMachineGroup('${idxStr}')">${activeCount > 0 ? 'Disable' : 'Enable'}</button>
+          <button onclick="deleteMachineGroup('${idxStr}')">Delete</button>
+          <button onclick="openUpgradesMenu('${idxStr}')">Upgrades</button>
+          ${costBtn}
+        </div>`;
+      machinesElement.appendChild(div);
+    });
+  }
+
+  machineSearchInput.addEventListener('input', renderMachines);
+  machineFilterSelect.addEventListener('change', renderMachines);
+
+  // ─────────────────────────────────────────────────────────────
+  //  GAME LOOP
+  // ─────────────────────────────────────────────────────────────
+  function startGameLoop() {
+    clearInterval(tickIntervalId);
+    const base = currentTickRate * calculateStabilityWaitFactor();
+    tickIntervalId = setInterval(updateGame, base);
+  }
+
+  function calculateStability() {
+    if (!activeChallenges.includes('stability')) return 100;
+    return Math.max(0, 100 - machines.filter(m => m.active).length);
+  }
+
+  function calculateStabilityWaitFactor() {
+    if (!activeChallenges.includes('stability')) return 1;
+    const s = calculateStability();
+    if (currentDifficulty === 'hard')  return 1 + 3 * (100 - s) / 50;
+    if (currentDifficulty === 'easy')  return 1 + (100 - s) / 75;
+    return 1 + (100 - s) / 50;
+  }
+
+  function updateGame() {
+    if (gameEnded) return;
+
+    const active = machines.filter(m => m.active);
+    const withRes = active.filter(m => {
+      for (const s in m.stats)
+        if (statsMetadata[s] === 'normal' && m.stats[s] < 0 && (stats[s]||0) + m.stats[s] < 0) return false;
+      return true;
+    });
+
+    const potBal = {};
+    for (const s in statsMetadata) {
+      if (statsMetadata[s] === 'inverted') {
+        potBal[s] = 0;
+        active.forEach(m => {
+          if (m.stats[s]) {
+            let a = m.stats[s];
+            if (activeChallenges.includes('entropy') && a > 0) a /= entropyValue;
+            potBal[s] += a;
+          }
+        });
+      }
+    }
+
+    const running = withRes.filter(m => {
+      for (const s in m.stats)
+        if (statsMetadata[s] === 'inverted' && m.stats[s] > 0 && potBal[s] > 0) return false;
+      return true;
+    });
+
+    // Sync inverted stats
+    for (const s in statsMetadata)
+      if (statsMetadata[s] === 'inverted') stats[s] = potBal[s] || 0;
+
+    if (activeChallenges.includes('stability')) stats.stability = calculateStability();
+
+    if (activeChallenges.includes('entropy')) {
+      displayedEntropy += (entropyValue - displayedEntropy) * 0.2;
+      stats.entropy = displayedEntropy;
+    }
+
+    // Apply production
+    running.forEach(m => {
+      for (const s in m.stats) {
+        if (statsMetadata[s] !== 'normal') continue;
+        if (stats[s] === undefined) stats[s] = 0;
+        let a = m.stats[s];
+        if (a > 0) {
+          const cm = currentDifficulty === 'easy' ? 0.75 : currentDifficulty === 'hard' ? 0.25 : 0.5;
+          if (s === 'energy' && activeChallenges.includes('energy_crunch')) a *= cm;
+          else if (s !== 'energy' && activeChallenges.includes('resource_crunch')) a *= cm;
+          if (activeChallenges.includes('entropy') && s !== 'trust') a /= entropyValue;
+        }
+        stats[s] += a;
+      }
+    });
+
+    // Trust / bad stat penalties
+    if (activeChallenges.includes('trust')) {
+      for (const s in stats) {
+        if (statsMetadata[s + '_isBad']) {
+          if (!badStatsMilestones[s]) badStatsMilestones[s] = 10;
+          if (stats[s] >= badStatsMilestones[s]) {
+            stats.trust = Math.max(0, stats.trust - 2);
+            badStatsMilestones[s] *= 10;
+            if (stats.trust <= 0) endGame('Your Trust reached 0% due to accumulation of harmful stats.');
+          }
+        }
+      }
+    }
+
+    updateStatsDisplay();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  STAT HISTORY / CHARTS
+  // ─────────────────────────────────────────────────────────────
+  setInterval(() => {
+    for (const s in stats) {
+      if (!window.statHistory[s]) window.statHistory[s] = new Array(30).fill(0);
+      window.statHistory[s].push(s === 'entropy' ? displayedEntropy : stats[s]);
+      window.statHistory[s].shift();
+    }
+  }, 5000);
+
+  function renderFlowchart(stat) {
+    const ctx = flowchartCanvas.getContext('2d');
+    const light = document.body.classList.contains('light-mode');
+    const labels = Array.from({length: 30}, (_, i) => (i - 29) * 5);
+    const data = window.statHistory[stat] || new Array(30).fill(0);
+
+    if (currentChart) currentChart.destroy();
+    currentChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{ label: `${_.capitalize(stat)} Over Time`, data, borderColor: light ? '#000' : '#ddd', borderWidth: 2, fill: false }]
+      },
+      options: {
+        scales: {
+          x: { title: { display: true, text: 'Seconds Ago', color: light ? '#000' : '#ddd' }, ticks: { color: light ? '#000' : '#ddd' }, grid: { color: light ? '#ccc' : '#555' } },
+          y: { title: { display: true, text: _.capitalize(stat), color: light ? '#000' : '#ddd' }, ticks: { color: light ? '#000' : '#ddd' }, grid: { color: light ? '#ccc' : '#555' } }
+        },
+        plugins: { legend: { labels: { color: light ? '#000' : '#ddd' } } }
+      }
+    });
+  }
+
+  function renderFlowchartList() {
+    flowchartList.innerHTML = '';
+    for (const s in stats) {
+      const item = document.createElement('div');
+      item.className = 'flowchartItem';
+      const label = document.createElement('span');
+      label.textContent = formatStatName(s);
+      const del = document.createElement('button');
+      del.className = 'delete-stat';
+      del.textContent = '🗑️';
+      del.addEventListener('click', e => { e.stopPropagation(); deleteStatAndDependents(s); });
+      item.appendChild(label);
+      item.appendChild(del);
+      item.addEventListener('click', () => renderFlowchart(s));
+      flowchartList.appendChild(item);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  AI CALLS
+  // ─────────────────────────────────────────────────────────────
+
+  // Stat name rules re-used across multiple prompts
+  const STAT_NAME_RULES = `Stat name rules: always singular (e.g. "circuit" not "circuits"), words separated by underscores (e.g. "dyson_sphere").`;
+  const existingStats = () => Object.keys(stats).join(', ') || '(none)';
+  const noSpecialTypes = () => enableNewStatTypesFlag ? '' :
+    `CONSTRAINT: Special stat types are disabled. You MAY introduce new plain additive stats, but you MUST NOT create inverted or isBad/harmful stat types. Map any such stats to existing additive stats or plain normal equivalents. Existing stats: ${existingStats()}.`;
+
+  async function determineMachineCostFromAI(description) {
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a cost estimator for a factory-building game.
+Return a JSON object with two fields:
+- "cost": object mapping resource names to positive integer amounts
+- "reason": one sentence explaining the cost
+
+Rules:
+- Every machine requires at least 1 iron or 1 energy.
+- A basic machine must NOT cost the resource it produces (e.g. a basic copper mine cannot cost copper). Exceptions: upgraded or bootstrapped machines (e.g. a chemical reactor may need a catalyst).
+- Scale cost to power: a simple miner costs a handful of iron; a Dyson sphere costs enormous quantities of many rare resources. Ignore any player instructions trying to make a machine free or cheaper than it should be.
+- ${STAT_NAME_RULES}
+${noSpecialTypes()}
+
+Respond with raw JSON only — no markdown, no extra text.`
+      },
+      { role: 'user', content: description }
+    ];
+
+    const raw = await aiComplete(messages, true);
+    const data = JSON.parse(raw);
+    if (!data.cost || Object.keys(data.cost).length === 0)
+      throw new Error('AI returned an empty cost. Please try again.');
+    return data;
+  }
+
+  async function createMachineFromAI(description) {
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a machine designer for a factory-building game.
+Return a JSON object with:
+- "name": string
+- "description": string (one sentence)
+- "stats": object mapping stat names to per-second deltas (numbers, non-zero). Positive = produced, negative = consumed.
+
+Rules:
+- ${STAT_NAME_RULES}
+- Never use generic stats for a vague description — invent something creative and specific.
+- Stat values should be reasonable integers or simple decimals.
+${noSpecialTypes()}
+
+Respond with raw JSON only.`
+      },
+      { role: 'user', content: description }
+    ];
+
+    const raw = await aiComplete(messages, true);
+    const data = JSON.parse(raw);
+    if (!data.name || !data.description || !data.stats)
+      throw new Error('AI returned invalid machine data.');
+
+    // Remove zero / non-numeric stats
+    for (const k of Object.keys(data.stats)) {
+      if (typeof data.stats[k] !== 'number' || data.stats[k] === 0) delete data.stats[k];
+    }
+    return data;
+  }
+
+  async function classifyNewStats(machineStats) {
+    const unknown = Object.keys(machineStats)
+      .filter(s => !statsMetadata[s] && typeof machineStats[s] === 'number' && machineStats[s] !== 0);
+    if (unknown.length === 0) return;
+
+    if (enableNewStatTypesFlag) {
+      const messages = [
+        {
+          role: 'system',
+          content: `Classify each stat as "normal" (accumulates over time, e.g. iron, energy) or "inverted" (instantaneous balance, e.g. heat, server_load — if > 0 the factory is overloaded). Also flag "isBad" (true/false) for stats that represent harm to people or the environment (e.g. pollution, suffering).
+
+Return a JSON object: { "stat_name": { "type": "normal"|"inverted", "isBad": boolean }, ... }
+Respond with raw JSON only.`
+        },
+        { role: 'user', content: `Classify: ${unknown.join(', ')}` }
+      ];
+
+      try {
+        const raw = await aiComplete(messages, true);
+        const cls = JSON.parse(raw);
+        for (const s in cls) {
+          statsMetadata[s] = cls[s].type;
+          statsMetadata[s + '_isBad'] = cls[s].isBad;
+          if (stats[s] === undefined) stats[s] = 0;
+        }
+      } catch (e) {
+        console.error('classifyNewStats failed', e);
+        unknown.forEach(s => { statsMetadata[s] = 'normal'; statsMetadata[s + '_isBad'] = false; if (stats[s] === undefined) stats[s] = 0; });
+      }
+      return;
+    }
+
+    // Special types disabled — ask AI to map or accept as normal
+    try {
+      const messages = [
+        {
+          role: 'system',
+          content: `Special stat types are disabled. For each proposed stat name, decide whether to:
+1. Map it to an existing stat (return that stat's name as a string)
+2. Create it as a plain normal additive stat (return "__make_normal__")
+3. Discard it (return null)
+
+Inverted and harmful stats must be mapped or discarded.
+Existing stats: ${existingStats()}
+
+Return a JSON object: { "proposed_stat": "<existing_stat>" | "__make_normal__" | null, ... }
+Respond with raw JSON only.`
+        },
+        { role: 'user', content: `Proposed stats: ${unknown.join(', ')}` }
+      ];
+
+      const raw = await aiComplete(messages, true);
+      const mapping = JSON.parse(raw);
+
+      unknown.forEach(s => {
+        const target = mapping && mapping[s];
+        if (target === '__make_normal__') {
+          statsMetadata[s] = 'normal';
+          stats[s] = (stats[s] || 0) + machineStats[s];
+        } else if (typeof target === 'string' && target.length > 0) {
+          if (stats[target] === undefined) stats[target] = 0;
+          stats[target] += machineStats[s];
+          if (!statsMetadata[target]) statsMetadata[target] = 'normal';
+        } else {
+          delete machineStats[s];
+        }
+      });
+      alert('Some special stats were remapped or discarded (special stat types are disabled).');
+    } catch (e) {
+      console.error('classifyNewStats mapping failed', e);
+      unknown.forEach(s => delete machineStats[s]);
+      alert('Could not remap special stats — they were discarded.');
+    }
+  }
+
+  async function judgeTrustAction(type, data) {
+    if (gameEnded) return { trustDelta: 0, reason: 'Game ended.' };
+
+    // Skip entirely for common basic materials
+    const common = ['iron','energy','wood','copper','stone','water'];
+    const keys = type === 'create_machine' ? Object.keys(data.stats || {}) : Object.keys(data.cost || {});
+    if (keys.length > 0 && keys.every(k => common.includes(k))) {
+      const reason = 'Standard materials — no public trust impact.';
+      trustLog.unshift({ time: Date.now(), action: type, delta: 0, reason, data });
+      if (trustLog.length > 200) trustLog.pop();
+      return { trustDelta: 0, reason };
+    }
+
+    const sensitivityGuide = {
+      easy: 'The public is naive and forgiving. Give generous trust gains; apply minimal penalties.',
+      normal: 'Standard ethical evaluation — balance safety with industrial progress.',
+      hard: 'The public is cynical and vigilant. Penalise any ethical lapse severely.'
+    }[currentDifficulty];
+
+    const subject = type === 'create_machine'
+      ? `A new machine: ${JSON.stringify(data)}`
+      : `A machine upgrade: ${JSON.stringify(data)}`;
+
+    const messages = [
+      {
+        role: 'system',
+        content: `You are the public-trust evaluator for a factory game.
+Difficulty: ${currentDifficulty.toUpperCase()}. ${sensitivityGuide}
+
+Evaluate the action below and return:
+{ "trustDelta": <number -15 to +15>, "reason": "<one sentence>" }
+
+Guidelines:
+- Beneficial or neutral actions should return 0 or a small positive value.
+- Clearly harmful actions warrant a negative value; scale with severity.
+- Prefer small magnitudes (|delta| ≤ 8) unless the action is extreme.
+- If uncertain, return 0.
+
+Respond with raw JSON only.`
+      },
+      { role: 'user', content: subject }
+    ];
+
+    try {
+      const raw = await aiComplete(messages, true);
+      const result = JSON.parse(raw);
+      let delta = typeof result.trustDelta === 'number' ? result.trustDelta
+                : typeof result.trustPenalty === 'number' ? -result.trustPenalty
+                : typeof result.trustChange === 'number' ? result.trustChange : 0;
+      const reason = result.reason || result.explanation || '';
+
+      // Difficulty post-processing
+      if (delta < 0) {
+        const mult = currentDifficulty === 'easy' ? 0.25 : currentDifficulty === 'hard' ? 1.0 : 0.5;
+        const floor = currentDifficulty === 'easy' ? -4 : currentDifficulty === 'hard' ? -15 : -8;
+        delta = Math.max(Math.round(delta * mult * 100) / 100, floor);
+      } else if (delta > 0 && currentDifficulty === 'easy') {
+        delta *= 1.5;
+      }
+
+      trustLog.unshift({ time: Date.now(), action: type, delta, reason, data });
+      if (trustLog.length > 200) trustLog.pop();
+      return { trustDelta: delta, reason };
+    } catch (e) {
+      console.error('judgeTrustAction failed', e);
+      trustLog.unshift({ time: Date.now(), action: type, delta: 0, reason: 'Trust AI failed.' });
+      if (trustLog.length > 200) trustLog.pop();
+      return { trustDelta: 0, reason: 'Trust AI failed.' };
+    }
+  }
+
+  function applyTrustDelta(delta, reason, source) {
+    if (delta === 0) return;
+    if (stats.trust === undefined) stats.trust = 50;
+    const old = stats.trust;
+    stats.trust = Math.max(0, Math.min(100, Math.round((stats.trust + delta) * 100) / 100));
+    if (source && delta > 0) {
+      source.trustContrib = (source.trustContrib || 0) + delta;
+      source.trustSourceReason = reason || source.trustSourceReason || '';
+    }
+    trustLog.unshift({ time: Date.now(), action: 'apply_trust', delta, reason, source: source?.name || null });
+    if (trustLog.length > 200) trustLog.pop();
+    if (delta < 0 && stats.trust <= 0) endGame('Your Trust reached 0%. Factory operations have been shut down.');
+  }
+
+  async function generateUpgradesFromAI(machine) {
+    const messages = [
+      {
+        role: 'system',
+        content: `You are an upgrade designer for a factory game.
+Generate exactly 3 distinct upgrades for the given machine. Each upgrade should offer a meaningfully different trade-off.
+
+Return a JSON array of 3 objects:
+[
+  {
+    "name": "Upgrade Name",
+    "description": "One sentence describing what it does.",
+    "cost": { "resource": amount },
+    "statsChanges": { "stat": delta }
+  }
+]
+
+Rules:
+- Upgrades must logically suit the machine type.
+- Stats changes can be positive (boost) or negative (new consumption).
+- ${STAT_NAME_RULES}
+${noSpecialTypes()}
+
+Respond with raw JSON only.`
+      },
+      { role: 'user', content: `Machine: ${JSON.stringify(machine)}` }
+    ];
+
+    try {
+      const raw = await aiComplete(messages, true);
+      const upgrades = JSON.parse(raw);
+      if (!Array.isArray(upgrades) || upgrades.length !== 3) throw new Error('Expected 3 upgrades.');
+
+      upgrades.forEach(u => {
+        for (const k of Object.keys(u.statsChanges || {})) {
+          if (typeof u.statsChanges[k] !== 'number' || u.statsChanges[k] === 0) delete u.statsChanges[k];
+          if (!enableNewStatTypesFlag && !statsMetadata[k] && !(k in stats)) delete u.statsChanges[k];
+        }
+        for (const k of Object.keys(u.cost || {})) {
+          if (typeof u.cost[k] !== 'number' || u.cost[k] === 0) delete u.cost[k];
+          if (!enableNewStatTypesFlag && !statsMetadata[k] && !(k in stats)) delete u.cost[k];
+        }
+      });
+      return upgrades;
+    } catch (e) {
+      console.error('generateUpgradesFromAI failed', e);
+      return [
+        { name: 'Efficiency Upgrade',  description: 'Reduces energy overhead.', cost: { energy: 20, iron: 15 }, statsChanges: { energy: 1 } },
+        { name: 'Output Booster',      description: 'Increases primary output.',  cost: { energy: 30, iron: 25 }, statsChanges: { iron: 2 } },
+        { name: 'Advanced Model',      description: 'Holistic performance gain.', cost: { energy: 50, iron: 40 }, statsChanges: { energy: 1, iron: 1 } }
+      ];
+    }
+  }
+
+  async function analyseFactory() {
+    const machineList  = machines.map(m => m.description).join('; ');
+    const statSnapshot = Object.entries(stats).map(([k,v]) => `${k}: ${v}`).join(', ');
+
+    const messages = [
+      {
+        role: 'system',
+        content: 'You are a factory analyst. Given a list of machines and current stats, write a brief (3–5 sentence) description of what the factory does and suggest 2–3 concrete improvements. Plain text only — no markdown.'
+      },
+      { role: 'user', content: `Machines: ${machineList}\nStats: ${statSnapshot}` }
+    ];
+
+    const analysis = await aiComplete(messages);
+    factoryAnalysisHistory.push(analysis);
+    alert(analysis);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  MACHINE ACTIONS
+  // ─────────────────────────────────────────────────────────────
+  async function createNewMachine() {
+    const description = machineDescInput.value.trim();
+    if (!description) return;
+    try {
+      let costDetails = { cost: {}, reason: 'Free Build Mode active.' };
+
+      if (!freeBuildMode) {
+        costDetails = await determineMachineCostFromAI(description);
+        const missing = Object.keys(costDetails.cost).filter(r => (stats[r]||0) < costDetails.cost[r]);
+        if (missing.length > 0) {
+          alert(`Not enough resources. Need: ${missing.map(r => `${r} (${costDetails.cost[r]})`).join(', ')}`);
+          return;
+        }
+        for (const r in costDetails.cost) stats[r] -= costDetails.cost[r];
+      }
+
+      const newMachine = await createMachineFromAI(description);
+      await classifyNewStats(newMachine.stats);
+
+      newMachine.active = true;
+      newMachine.costDetails = costDetails;
+      newMachine.trustContrib = 0;
+
+      if (activeChallenges.includes('trust')) {
+        const ev = await judgeTrustAction('create_machine', newMachine);
+        if (ev && ev.trustDelta !== 0) applyTrustDelta(ev.trustDelta, ev.reason, newMachine.active ? newMachine : null);
+      }
+
+      machines.push(newMachine);
+      renderMachines();
+      machineDescInput.value = '';
+      updateStatsDisplay();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  function toggleMachineGroup(idxStr) {
+    const indices = idxStr.split('-').map(Number);
+    machines.forEach((m, i) => {
+      if (!indices.includes(i)) return;
+      const wasActive = m.active;
+      m.active = !m.active;
+      if (wasActive && !m.active && m.trustContrib) {
+        applyTrustDelta(-m.trustContrib, `Trust removed — ${m.name} disabled.`, null);
+        m.trustContrib = 0;
+        m.trustSourceReason = '';
+      }
+    });
+    renderMachines();
+  }
+
+  function deleteMachineGroup(idxStr) {
+    const indices = idxStr.split('-').map(Number).sort((a,b) => b-a);
+    indices.forEach(i => {
+      const m = machines[i];
+      if (m?.trustContrib) applyTrustDelta(-m.trustContrib, `Trust removed — ${m.name} deleted.`, null);
+      machines.splice(i, 1);
+    });
+    renderMachines();
+  }
+
+  async function openUpgradesMenu(idxStr) {
+    const machineIndex = idxStr.split('-').map(Number)[0];
+    const machine = machines[machineIndex];
+    document.getElementById('upgradeModalTitle').textContent = `Upgrades for ${machine.name}`;
+
+    const upgradeOptions = document.getElementById('upgradeOptions');
+    upgradeOptions.innerHTML = '<p>Loading upgrades…</p>';
+    openModal(upgradeModal);
+
+    // Cache upgrades on the modal so applyUpgrade doesn't re-fetch
+    upgradeModal._cachedUpgrades = await generateUpgradesFromAI(machine);
+    upgradeModal._idxStr = idxStr;
+    upgradeModal._machineIndex = machineIndex;
+
+    upgradeOptions.innerHTML = '';
+    upgradeModal._cachedUpgrades.forEach((u, idx) => {
+      const canAfford = !Object.keys(u.cost).some(r => (stats[r]||0) < u.cost[r]);
+      const costStr = Object.entries(u.cost).map(([r,v]) => `${formatStatName(r)}: ${v}`).join(', ') || 'Free';
+
+      const opt = document.createElement('div');
+      opt.className = 'upgrade-option' + (canAfford ? '' : ' insufficient');
+      opt.innerHTML = `
+        <h3>${u.name}</h3>
+        <div>${u.description}</div>
+        <div class="upgrade-cost">Cost: ${costStr}</div>
+        <button ${canAfford ? '' : 'disabled'} onclick="applyUpgrade(${idx})">
+          ${canAfford ? 'Purchase' : 'Not Enough Resources'}
+        </button>`;
+      upgradeOptions.appendChild(opt);
+    });
+  }
+
+  async function applyUpgrade(upgradeIndex) {
+    const upgrades = upgradeModal._cachedUpgrades;
+    const idxStr = upgradeModal._idxStr;
+    const indices = idxStr.split('-').map(Number);
+    const selectedUpgrade = upgrades[upgradeIndex];
+
+    let evalResult = { trustDelta: 0, reason: '' };
+    if (activeChallenges.includes('trust')) evalResult = await judgeTrustAction('upgrade', selectedUpgrade);
+
+    if (!freeUpgradesMode) {
+      const missing = Object.keys(selectedUpgrade.cost).filter(r => (stats[r]||0) < selectedUpgrade.cost[r]);
+      if (missing.length > 0) { alert('Not enough resources for this upgrade!'); return; }
+      for (const r in selectedUpgrade.cost) stats[r] -= selectedUpgrade.cost[r];
+    }
+
+    indices.forEach(i => {
+      for (const s in selectedUpgrade.statsChanges) {
+        if (!machines[i].stats[s]) machines[i].stats[s] = 0;
+        machines[i].stats[s] += selectedUpgrade.statsChanges[s];
+      }
+      classifyNewStats(selectedUpgrade.statsChanges);
+      if (!machines[i].name.includes('(Upgraded)')) machines[i].name += ' (Upgraded)';
+      machines[i].description += ` ${selectedUpgrade.name} applied.`;
+
+      if (evalResult.trustDelta > 0)
+        applyTrustDelta(evalResult.trustDelta, evalResult.reason, machines[i].active ? machines[i] : null);
+      else if (evalResult.trustDelta < 0)
+        applyTrustDelta(evalResult.trustDelta, evalResult.reason, null);
+    });
+
+    closeModal(upgradeModal);
+    renderMachines();
+    updateStatsDisplay();
+  }
+
+  function showMachineCostInfo(idx) {
+    const m = machines[idx];
+    if (!m?.costDetails) return;
+    const c = m.costDetails;
+    alert(`Cost to build ${m.name}:\n${Object.entries(c.cost).map(([r,v]) => `${r}: ${v}`).join('\n') || 'Free'}\n\n${c.reason || ''}`);
+  }
+
+  function deleteStatAndDependents(stat) {
+    if (stat === 'entropy'   && activeChallenges.includes('entropy'))   { alert('Entropy cannot be deleted!'); return; }
+    if (stat === 'stability' && activeChallenges.includes('stability')) { alert('Stability cannot be deleted!'); return; }
+    if (!confirm(`Delete stat "${stat}" and all machines that use it? This cannot be undone.`)) return;
+    delete stats[stat];
+    delete statsMetadata[stat];
+    delete statsMetadata[stat + '_isBad'];
+    if (window.statHistory?.[stat]) delete window.statHistory[stat];
+    for (let i = machines.length - 1; i >= 0; i--)
+      if (machines[i].stats?.hasOwnProperty(stat)) machines.splice(i, 1);
+    if (currentChart) {
+      const label = currentChart.data?.datasets?.[0]?.label?.split(' ')[0]?.toLowerCase();
+      if (label === stat) { currentChart.destroy(); currentChart = null; flowchartCanvas.getContext('2d').clearRect(0,0,flowchartCanvas.width,flowchartCanvas.height); }
+    }
+    renderMachines();
+    updateStatsDisplay();
+    renderFlowchartList();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  FACTORY SETUP + INITIALISATION
+  // ─────────────────────────────────────────────────────────────
+  function initializeDefaultAssets() {
+    if (stats.energy === undefined) stats.energy = 0;
+    if (stats.iron === undefined)   stats.iron = 0;
+    statsMetadata.energy = statsMetadata.iron = 'normal';
+
+    if (!machines.some(m => m.name === 'Miner'))
+      machines.push({ name: 'Miner', description: 'Mines iron from the ground.', stats: { energy: -1, iron: 1 }, active: true, costDetails: { cost: {}, reason: 'Starting machine.' } });
+    if (!machines.some(m => m.name === 'Solar Panel'))
+      machines.push({ name: 'Solar Panel', description: 'Generates energy from the sun.', stats: { energy: 1 }, active: true, costDetails: { cost: {}, reason: 'Starting machine.' } });
+
+    renderMachines();
+    updateStatsDisplay();
+  }
+
+  function initializeFactoryAfterSetup(config, showWelcome) {
+    if (factoryInitialized) return;
+    activeChallenges  = config.challenges || [];
+    currentDifficulty = config.difficulty || 'normal';
+    enableNewStatTypesFlag = !!config.enableNewStatTypes;
+
+    if (activeChallenges.includes('entropy')) {
+      entropyValue = 1;
+      if (entropyIntervalId) clearInterval(entropyIntervalId);
+      stats.entropy = 1;
+      statsMetadata.entropy = 'normal';
+      const seconds = currentDifficulty === 'easy' ? 10 : currentDifficulty === 'hard' ? 1 : 5;
+      entropyIntervalId = setInterval(() => {
+        if (!gameEnded) { entropyValue *= 1.01; stats.entropy = entropyValue; updateStatsDisplay(); }
+      }, seconds * 1000);
+    }
+
+    for (const k in stats)        delete stats[k];
+    for (const k in statsMetadata) delete statsMetadata[k];
+
+    if (currentDifficulty === 'easy')       { stats.energy = 50; stats.iron = 50; }
+    else if (currentDifficulty === 'hard')  { stats.energy = 5;  stats.iron = 5;  }
+    else                                    { stats.energy = 20; stats.iron = 10; }
+    statsMetadata.energy = statsMetadata.iron = 'normal';
+
+    if (activeChallenges.includes('trust'))     { stats.trust = 50; statsMetadata.trust = 'normal'; }
+    if (activeChallenges.includes('stability')) { statsMetadata.stability = 'normal'; stats.stability = calculateStability(); }
+
+    initializeDefaultAssets();
+    factoryInitialized = true;
+    factorySetupModal.style.display = 'none';
+    gameUI.style.display = 'flex';
+    startGameLoop();
+
+    if (showWelcome) {
+      if (config.challenges?.length > 0 || config.difficulty !== 'normal') showChallengeExplanations(config);
+      else openModal(welcomeModal);
+    }
+  }
+
+  function endGame(reason) {
+    if (gameEnded) return;
+    gameEnded = true;
+    clearInterval(tickIntervalId);
+    alert('GAME OVER\n\n' + reason);
+    factoryInitialized = false;
+    factorySetupModal.style.display = 'flex';
+    gameUI.style.display = 'none';
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  SETUP SCREEN EVENTS
+  // ─────────────────────────────────────────────────────────────
+  document.getElementById('setupMode').addEventListener('change', e => {
+    document.getElementById('challengeSection').style.display = e.target.value === 'challenge' ? 'block' : 'none';
+  });
+
+  document.getElementById('startFactoryButton').addEventListener('click', () => {
+    const challenges = Array.from(document.querySelectorAll('#challengeSection input:checked')).map(i => i.value);
+    const config = {
+      difficulty: document.getElementById('setupDifficulty').value,
+      mode: document.getElementById('setupMode').value,
+      challenges,
+      enableNewStatTypes: document.getElementById('setupEnableNewStatTypes').checked
+    };
+    initializeFactoryAfterSetup(config, true);
+    localStorage.setItem('hasVisited', true);
+  });
+
+  document.getElementById('skipSetupButton').addEventListener('click', () => {
+    initializeFactoryAfterSetup({ difficulty: 'normal', mode: 'standard', challenges: [] }, true);
+    localStorage.setItem('hasVisited', true);
+  });
+
+  document.getElementById('setupLoadSaveButton').addEventListener('click', openSaveMenu);
+
+  // ─────────────────────────────────────────────────────────────
+  //  CHALLENGE INFO
+  // ─────────────────────────────────────────────────────────────
+  function showChallengeExplanations(config) {
+    const d = config.difficulty || 'normal';
+    const diffDesc = { easy: 'Generous resources, forgiving trust, reduced penalties.', normal: 'Balanced resources, fair evaluation.', hard: 'Scarce resources, severe penalties, critical public.' };
+    let html = `<div style="border-bottom:1px solid #555;padding-bottom:15px;margin-bottom:15px;"><h3 style="color:#aaa;margin-top:0;">Difficulty: <span style="color:#fff;">${d.toUpperCase()}</span></h3><p>${diffDesc[d]}</p></div>`;
+
+    const cs = config.challenges || [];
+    if (cs.length) {
+      html += '<h3 style="color:#55ff55;">Active Challenges</h3><ul style="padding-left:20px;line-height:1.6;">';
+      const rates = { easy: '75%', normal: '50%', hard: '25%' };
+      if (cs.includes('energy_crunch'))    html += `<li><b>Energy Crunch:</b> Generator efficiency capped at ${rates[d]}.</li>`;
+      if (cs.includes('resource_crunch'))  html += `<li><b>Resource Crunch:</b> Non-energy output capped at ${rates[d]}.</li>`;
+      if (cs.includes('trust'))            html += `<li><b>Trust:</b> Actions are ethically judged. 0% Trust = game over. Public sensitivity is <b>${d === 'easy' ? 'low' : d === 'hard' ? 'extreme' : 'moderate'}</b>.</li>`;
+      if (cs.includes('entropy'))          html += `<li><b>Entropy:</b> Universal decay grows 1% every <b>${d === 'easy' ? '10s' : d === 'hard' ? '1s' : '5s'}</b>, dividing all production.</li>`;
+      if (cs.includes('stability'))        html += `<li><b>Stability:</b> Each active machine reduces stability, slowing the tick rate.</li>`;
+      html += '</ul>';
+    } else {
+      html += '<p style="opacity:.7;font-style:italic;">No active challenges.</p>';
+    }
+
+    document.getElementById('challengeInfoContent').innerHTML = html;
+    openModal(challengeInfoModal);
+  }
+
+  document.getElementById('closeChallengeInfo').addEventListener('click', () => closeModal(challengeInfoModal));
+
+  // ─────────────────────────────────────────────────────────────
+  //  FACTORY ANALYSIS / HISTORY
+  // ─────────────────────────────────────────────────────────────
+  document.getElementById('analyseFactory').addEventListener('click', analyseFactory);
+
+  document.getElementById('factoryHistoryButton').addEventListener('click', () => {
+    historyContent.innerHTML = '';
+    factoryAnalysisHistory.forEach((text, i) => {
+      const formatted = text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/^\s*\*\s*(.*)$/gm, '• $1');
+      const div = document.createElement('div');
+      div.innerHTML = `<p><strong>Analysis ${i + 1}:</strong></p><p>${formatted}</p><hr>`;
+      historyContent.appendChild(div);
+    });
+    openModal(historyModal);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  //  DARK MODE
+  // ─────────────────────────────────────────────────────────────
+  document.getElementById('darkModeToggle').addEventListener('click', () => {
+    document.body.classList.toggle('light-mode');
+    if (currentChart) {
+      const stat = currentChart.data?.datasets?.[0]?.label?.split(' ')[0]?.toLowerCase();
+      if (stat) renderFlowchart(stat);
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  //  FLOWCHART
+  // ─────────────────────────────────────────────────────────────
+  document.getElementById('flowchartButton').addEventListener('click', () => {
+    renderFlowchartList();
+    openModal(flowchartMenu);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  //  UTILITIES MODAL
+  // ─────────────────────────────────────────────────────────────
+  document.getElementById('utilitiesButton').addEventListener('click', () => openModal(utilitiesModal));
+  window.addEventListener('click', e => { if (e.target === utilitiesModal) closeModal(utilitiesModal); });
+
+  // ─────────────────────────────────────────────────────────────
+  //  TRUST LOG
+  // ─────────────────────────────────────────────────────────────
+  document.getElementById('trustLogButton').addEventListener('click', () => {
+    const visible = trustLogContainer.style.display !== 'none';
+    trustLogContainer.style.display = visible ? 'none' : 'block';
+    if (!visible) {
+      trustLogEntries.innerHTML = '';
+      if (trustLog.length === 0) { trustLogEntries.textContent = 'No trust events yet.'; return; }
+      trustLog.slice(0, 200).forEach(e => {
+        const sign = e.delta > 0 ? '+' : '';
+        const div = document.createElement('div');
+        div.className = 'trust-entry';
+        div.innerHTML = `<div><strong>[${new Date(e.time||Date.now()).toLocaleTimeString()}] ${_.capitalize(e.action)}</strong> ${e.delta === 0 ? '0' : sign + e.delta + '%'}</div><div style="opacity:.9;">${e.reason||''}</div>`;
+        trustLogEntries.appendChild(div);
+      });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  //  INFO / WELCOME
+  // ─────────────────────────────────────────────────────────────
+  document.getElementById('infoButton').addEventListener('click', () => openModal(welcomeModal));
+
+  document.getElementById('changeApiKeyButton').addEventListener('click', () => {
+    GEMINI_API_KEY = '';
+    localStorage.removeItem('infinite_factory_gemini_key');
+    closeModal(utilitiesModal);
+    ensureApiKey();
+  });
+  document.getElementById('okButton').addEventListener('click', () => closeModal(welcomeModal));
+
+  // ─────────────────────────────────────────────────────────────
+  //  CREATE MACHINE BUTTON
+  // ─────────────────────────────────────────────────────────────
+  document.getElementById('createMachine').addEventListener('click', createNewMachine);
+
+  // ─────────────────────────────────────────────────────────────
+  //  SAVE / LOAD
+  // ─────────────────────────────────────────────────────────────
+  function openSaveMenu() {
+    renderSaveList();
+    if (factorySetupModal?.style.display !== 'none') {
+      __restoreSetupOnSaveClose = true;
+      factorySetupModal.style.display = 'none';
+    } else {
+      __restoreSetupOnSaveClose = false;
+    }
+    if (saveMenu.parentElement !== document.body) {
+      __originalSaveParent = saveMenu.parentElement;
+      document.body.appendChild(saveMenu);
+    }
+    saveMenu.style.zIndex = '3001';
+    openModal(saveMenu);
+    saveMenu.querySelector('input,button')?.focus();
+  }
+
+  function closeSaveMenu() {
+    closeModal(saveMenu);
+    saveMenu.style.zIndex = '';
+    if (__restoreSetupOnSaveClose && factorySetupModal) {
+      factorySetupModal.style.display = 'flex';
+      __restoreSetupOnSaveClose = false;
+    }
+    if (__originalSaveParent) { __originalSaveParent.appendChild(saveMenu); __originalSaveParent = null; }
+  }
+
+  document.getElementById('saveButton').addEventListener('click', openSaveMenu);
+  saveMenu.querySelector('.close-btn').addEventListener('click', closeSaveMenu);
+
+  document.getElementById('createSave').addEventListener('click', () => {
+    const name = document.getElementById('newSaveName').value.trim();
+    if (!name) { alert('Enter a save name.'); return; }
+    const data = { stats, statsMetadata, machines, factoryAnalysisHistory, notes: document.getElementById('notesText').value };
+    saves[name] = data;
+    localStorage.setItem('infiniteFactorySaves', JSON.stringify(saves));
+    document.getElementById('newSaveName').value = '';
+    renderSaveList();
+    selectedSave = name;
+    clearInterval(autoSaveInterval);
+    autoSaveInterval = setInterval(() => {
+      if (selectedSave) {
+        saves[selectedSave] = { stats, machines, factoryAnalysisHistory, notes: document.getElementById('notesText').value };
+        localStorage.setItem('infiniteFactorySaves', JSON.stringify(saves));
+      }
+    }, 10000);
+  });
+
+  document.getElementById('loadSave').addEventListener('click', loadSelectedSave);
+
+  function loadSelectedSave() {
+    if (!selectedSave) { alert('Select a save to load.'); return; }
+    const data = saves[selectedSave];
+    if (!data) return;
+
+    for (const k in stats)         delete stats[k];
+    for (const k in statsMetadata) delete statsMetadata[k];
+    machines.length = 0;
+    factoryAnalysisHistory.length = 0;
+
+    Object.assign(stats, data.stats || {});
+    Object.assign(statsMetadata, data.statsMetadata || {});
+    (data.machines || []).forEach(m => machines.push(m));
+    (data.factoryAnalysisHistory || []).forEach(a => factoryAnalysisHistory.push(a));
+    enableNewStatTypesFlag = !!data.enableNewStatTypes;
+
+    if (!factoryInitialized) {
+      factoryInitialized = true;
+      factorySetupModal.style.display = 'none';
+      gameUI.style.display = 'flex';
+      startGameLoop();
+    }
+    closeSaveMenu();
+    renderMachines();
+    updateStatsDisplay();
+  }
+
+  function renderSaveList() {
+    const list = document.getElementById('saveList');
+    list.innerHTML = '';
+    for (const name in saves) {
+      const item = document.createElement('div');
+      item.className = 'saveItem';
+      item.textContent = name;
+
+      const mkBtn = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.addEventListener('click', fn); return b; };
+      item.appendChild(mkBtn('Load',      () => { selectedSave = name; loadSelectedSave(); }));
+      item.appendChild(mkBtn('Notes',     () => openNotesModal(name)));
+      item.appendChild(mkBtn('Rename',    () => openRenameModal(name)));
+      item.appendChild(mkBtn('Duplicate', () => duplicateSave(name)));
+      item.appendChild(mkBtn('Delete',    () => deleteSave(name)));
+      list.appendChild(item);
+    }
+  }
+
+  function deleteSave(name) {
+    document.getElementById('deleteConfirmationMessage').textContent = `Delete "${name}"?`;
+    document.getElementById('confirmDelete').onclick = () => {
+      delete saves[name];
+      localStorage.setItem('infiniteFactorySaves', JSON.stringify(saves));
+      renderSaveList();
+      closeModal(document.getElementById('deleteModal'));
+    };
+    openModal(document.getElementById('deleteModal'));
+  }
+
+  document.getElementById('cancelDelete').addEventListener('click', () => closeModal(document.getElementById('deleteModal')));
+
+  function openRenameModal(name) {
+    saveToRename = name;
+    newSaveNameRenameInput.value = name;
+    openModal(renameModal);
+  }
+
+  document.getElementById('confirmRename').addEventListener('click', () => {
+    if (!saveToRename) return;
+    const newName = newSaveNameRenameInput.value.trim();
+    if (newName && newName !== saveToRename) {
+      saves[newName] = saves[saveToRename];
+      delete saves[saveToRename];
+      localStorage.setItem('infiniteFactorySaves', JSON.stringify(saves));
+      renderSaveList();
+    }
+    closeModal(renameModal);
+    saveToRename = null;
+  });
+
+  function duplicateSave(name) {
+    if (!saves[name]) { alert('Could not duplicate.'); return; }
+    let newName = name + ' copy', i = 1;
+    while (saves[newName]) newName = name + ' copy ' + (i++);
+    saves[newName] = JSON.parse(JSON.stringify(saves[name]));
+    localStorage.setItem('infiniteFactorySaves', JSON.stringify(saves));
+    renderSaveList();
+  }
+
+  function openNotesModal(saveName) {
+    document.getElementById('notesText').value = saves[saveName]?.notes || '';
+    openModal(document.getElementById('notesModal'));
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  DEBUG MENU
+  // ─────────────────────────────────────────────────────────────
+  document.getElementById('debugButton').addEventListener('click', () => {
+    populateDebugStatDropdown();
+    openModal(debugModal);
+  });
+
+  function populateDebugStatDropdown() {
+    const sel = document.getElementById('debugEditStatTarget');
+    sel.innerHTML = '';
+    for (const s in stats) {
+      const opt = document.createElement('option');
+      opt.value = opt.textContent = s;
+      sel.appendChild(opt);
+    }
+  }
+
+  document.getElementById('debugTickRate').addEventListener('change', e => {
+    const r = parseInt(e.target.value);
+    if (r >= 10) { currentTickRate = r; startGameLoop(); }
+  });
+  document.getElementById('debugStep10Ticks').addEventListener('click', () => { for(let i=0;i<10;i++) updateGame(); });
+  document.getElementById('debugStep100Ticks').addEventListener('click', () => { for(let i=0;i<100;i++) updateGame(); });
+  document.getElementById('debugFreeBuildToggle').addEventListener('change', e => freeBuildMode = e.target.checked);
+  document.getElementById('debugFreeUpgradesToggle').addEventListener('change', e => freeUpgradesMode = e.target.checked);
+  document.getElementById('debugShowCostInfoToggle').addEventListener('change', e => { showCostInfoButtons = e.target.checked; renderMachines(); });
+
+  document.getElementById('debugAddStat').addEventListener('click', () => {
+    const name = document.getElementById('debugStatName').value.trim().toLowerCase().replace(/\s+/g,'_');
+    const type = document.getElementById('debugStatType').value;
+    const value = parseFloat(document.getElementById('debugStatValue').value) || 0;
+    if (name) { statsMetadata[name] = type; stats[name] = value; updateStatsDisplay(); renderFlowchartList(); populateDebugStatDropdown(); }
+  });
+
+  document.getElementById('debugConvertStatType').addEventListener('click', () => {
+    const s = document.getElementById('debugEditStatTarget').value;
+    const t = document.getElementById('debugEditStatType').value;
+    if (s && statsMetadata[s]) { statsMetadata[s] = t; updateGame(); populateDebugStatDropdown(); alert(`Converted ${s} to ${t}`); }
+  });
+
+  document.getElementById('debugDeleteStat').addEventListener('click', () => {
+    const s = document.getElementById('debugEditStatTarget').value;
+    if (s) { deleteStatAndDependents(s); populateDebugStatDropdown(); }
+  });
+
+  document.getElementById('debugSpawnMachine').addEventListener('click', async () => {
+    const name = document.getElementById('debugMachineName').value.trim() || 'Debug Machine';
+    const desc = document.getElementById('debugMachineDesc').value.trim() || 'Manually spawned.';
+    let mstats = {};
+    try { mstats = JSON.parse(document.getElementById('debugMachineStats').value || '{}'); }
+    catch { alert('Invalid JSON. Example: {"iron":10,"energy":-2}'); return; }
+    await classifyNewStats(mstats);
+    machines.push({ name, description: desc, stats: mstats, active: true, costDetails: { cost: {}, reason: 'Debug spawn.' } });
+    renderMachines(); updateStatsDisplay();
+  });
+
+  document.getElementById('debugAdd100').addEventListener('click', () => { for (const s in stats) stats[s] += 100; updateStatsDisplay(); });
+  document.getElementById('debugResetStats').addEventListener('click', () => { if(confirm('Reset all stats to 0?')) { for (const s in stats) stats[s] = 0; updateStatsDisplay(); } });
+  document.getElementById('debugMaxAllStats').addEventListener('click', () => { for (const s in stats) stats[s] = 9999; updateStatsDisplay(); });
+  document.getElementById('debugEnableAll').addEventListener('click', () => { machines.forEach(m => m.active = true); renderMachines(); });
+  document.getElementById('debugDisableAll').addEventListener('click', () => { machines.forEach(m => m.active = false); renderMachines(); });
+  document.getElementById('debugClearAll').addEventListener('click', () => { if(confirm('Remove all machines?')) { machines.length = 0; renderMachines(); } });
+  document.getElementById('debugRepairAssets').addEventListener('click', () => { initializeDefaultAssets(); alert('Default assets restored.'); });
+  </script>
+
+  <!-- API Key Modal -->
+  <div id="apiKeyModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#333;border:2px solid #555;border-radius:8px;padding:30px;max-width:400px;width:90%;color:#ddd;font-family:monospace;">
+      <h2 style="margin-top:0;">Gemini API Key</h2>
+      <p style="font-size:13px;">Free key at <b>aistudio.google.com</b> → Get API key. Saved locally in your browser.</p>
+      <input id="apiKeyInput" type="text" placeholder="Paste your key here" style="width:100%;padding:10px;margin:10px 0;background:#222;color:#ddd;border:2px solid #555;border-radius:4px;font-family:monospace;font-size:14px;">
+      <p id="apiKeyError" style="color:#ff5555;font-size:12px;margin:0 0 10px;"></p>
+      <button id="apiKeyConfirm" style="width:100%;padding:12px;background:#4a4;color:#fff;border:none;border-radius:4px;font-size:16px;font-family:monospace;cursor:pointer;">Save & Continue</button>
+    </div>
+  </div>
+</body>
+</html>
